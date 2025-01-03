@@ -13,9 +13,9 @@ import java.net.URL;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.Optional;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
+import static java.time.temporal.ChronoUnit.SECONDS;
 
 public class Main {
     public static Duration maxTime = Duration.ofHours(1);
@@ -45,15 +45,25 @@ public class Main {
         }
     });
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
+        System.out.println(LocalDateTime.now().truncatedTo(SECONDS));
+        try {
+            Lock.lock();
+            Processes.print();
+        } catch (Exception e) {
+            Thread.sleep(500_000);
+            throw new RuntimeException(e);
+        }
+
         start();
         System.out.println("Started");
 
         Thread hook = new Thread(() -> {
             try {
                 fine(file);
+                Lock.release();
             } catch (Exception e) {
-                System.out.println("Error writing into file");
+                System.out.println("Error writing into file: " + e.getMessage());
             }
             System.out.println("In the middle of a shutdown");
         });
@@ -74,33 +84,11 @@ public class Main {
         }
     }
 
-    private static void printDetails(ProcessHandle process) {
-        if (process.info().command().isPresent()) {
-            System.out.println(String.format("%8d %8s %10s %26s %-40s",
-                    process.pid(),
-                    text(process.parent().map(ProcessHandle::pid)),
-                    text(process.info().user()),
-                    text(process.info().startInstant()),
-                    text(process.info().command()),
-                    text(process.info().commandLine())
-            ));
-        }
-    }
-
-    private static String text(Optional<?> optional) {
-        return optional.map(Object::toString).orElse("-");
-    }
-
     private static void start() {
-        ProcessHandle.allProcesses().forEach(Main::printDetails);
-
         isLocked = false;
         started = LocalDateTime.now();
         try {
-            String home = System.getProperty("user.home");
-            File dir = new File(home, "/.ch");
-            if (!dir.exists()) dir.mkdir();
-            file = new File(dir, "data");
+            file = new File(HomePath.home, "data");
             if (file.exists()) {
                 try (BufferedReader reader = new BufferedReader(new FileReader(file, UTF_8))) {
                     LocalDate now = LocalDate.now();
@@ -109,7 +97,7 @@ public class Main {
                 }
             }
 
-            File file = new File(dir, "data.ko");
+            File file = new File(HomePath.home, "data.ko");
             if (file.exists()) {
                 try (BufferedReader reader = new BufferedReader(new FileReader(file, UTF_8))) {
                     maxTime = Duration.parse(reader.readLine());
