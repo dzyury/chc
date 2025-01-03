@@ -13,6 +13,7 @@ import java.net.URL;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
@@ -73,7 +74,26 @@ public class Main {
         }
     }
 
+    private static void printDetails(ProcessHandle process) {
+        if (process.info().command().isPresent()) {
+            System.out.println(String.format("%8d %8s %10s %26s %-40s",
+                    process.pid(),
+                    text(process.parent().map(ProcessHandle::pid)),
+                    text(process.info().user()),
+                    text(process.info().startInstant()),
+                    text(process.info().command()),
+                    text(process.info().commandLine())
+            ));
+        }
+    }
+
+    private static String text(Optional<?> optional) {
+        return optional.map(Object::toString).orElse("-");
+    }
+
     private static void start() {
+        ProcessHandle.allProcesses().forEach(Main::printDetails);
+
         isLocked = false;
         started = LocalDateTime.now();
         try {
