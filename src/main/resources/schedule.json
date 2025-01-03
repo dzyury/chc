@@ -1,15 +1,14 @@
 {
   "week": {
-    "monday": "60m",
-    "tuesday": "60m",
-    "wednesday": "60m",
-    "thursday": "60m",
-    "friday": "60m",
-    "saturday": "60m",
-    "sunday": "60m"
+    "monday": "pt60m",
+    "tuesday": "pt60m",
+    "wednesday": "pt60m",
+    "thursday": "pt60m",
+    "friday": "pt60m",
+    "saturday": "pt60m",
+    "sunday": "pt60m"
   },
   "calendar": {
-    "today": "60m",
-    "2025-01-07": "70m"
+    "2025-01-07": "pt70m"
   }
 }
