@@ -51,7 +51,6 @@ public class Main {
             Lock.lock();
             Processes.print();
         } catch (Exception e) {
-            Thread.sleep(500_000);
             throw new RuntimeException(e);
         }
 
