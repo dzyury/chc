@@ -1,4 +1,5 @@
 {
+  "everyDay": "pt60m",
   "week": {
     "monday": "pt60m",
     "tuesday": "pt60m",

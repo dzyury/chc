@@ -1,41 +1,63 @@
 package misc;
 
+import com.dropbox.core.DbxDownloader;
+import com.dropbox.core.DbxException;
+import com.dropbox.core.v2.files.FileMetadata;
+import com.dropbox.core.v2.files.FolderMetadata;
+import com.dropbox.core.v2.files.ListFolderResult;
+import com.dropbox.core.v2.files.Metadata;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.json.JsonMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import misc.data.ChcResult;
 import misc.data.Logger;
+import misc.data.Schedule;
+import misc.drop.DBClient;
 
 import javax.swing.*;
 import java.awt.*;
 import java.awt.desktop.UserSessionEvent;
 import java.awt.desktop.UserSessionListener;
-import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.FileReader;
+import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.PrintWriter;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.URL;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.time.temporal.ChronoUnit.SECONDS;
 
 public class Main {
+    private static final String RESULT = "result.json";
+    private static final String SCHEDULE = "schedule.json";
+    public static final int PERIOD = 300_000; // 5 min
     public static Duration maxTime = Duration.ofHours(1);
 
+    public static String id;
     public static Dialog dialog;
-    public static File file;
     public static ShutDownManager man = new ShutDownManager();
     public static volatile boolean isDialogVisible = false;
     public static volatile boolean isLocked = false;
 
-    public static LocalDate started = LocalDate.now();
-    public static Duration preElapsed = Duration.ofSeconds(0);
-    public static Duration elapsed = preElapsed;
+    public static DBClient dbClient = new DBClient();
+    public static LocalDateTime started = LocalDateTime.now();
+    public static Duration preElapsed = Duration.ZERO;
+    public static Duration elapsed = Duration.ZERO;
+    public static ObjectMapper mapper = JsonMapper.builder()
+            .addModule(new JavaTimeModule())
+            .build()
+            .setSerializationInclusion(JsonInclude.Include.NON_NULL);
+
     public static Timer timer = new Timer(1000, e -> {
-        LocalDate now = LocalDate.now();
-        if (!now.equals(started)) {
+        LocalDateTime now = LocalDateTime.now();
+        if (!now.toLocalDate().equals(started.toLocalDate())) {
             started = now;
-            preElapsed = Duration.ofSeconds(0);
+            preElapsed = Duration.ZERO;
         }
 
         if (!isLocked) {
@@ -47,7 +69,10 @@ public class Main {
         }
     });
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
+        if (args.length != 1) return;
+
+        id = args[0];
         Logger.log(LocalDateTime.now().truncatedTo(SECONDS));
         try {
             Lock.lock();
@@ -57,11 +82,10 @@ public class Main {
             return;
         }
 
-        start();
         Logger.log("Started");
         Thread hook = new Thread(() -> {
             try {
-                fine(file);
+                upload(dbClient, mapper);
                 Lock.release();
             } catch (Exception e) {
                 Logger.log("Error writing into file: " + e.getMessage());
@@ -70,44 +94,106 @@ public class Main {
         });
         Runtime.getRuntime().addShutdownHook(hook);
         SwingUtilities.invokeLater(Main::createAndShowGUI);
+        start();
     }
 
-    private static void fine(File file) {
-        isLocked = true;
-        try (PrintWriter writer = new PrintWriter(file, UTF_8)) {
+    private static void start() throws Exception {
+        isLocked = false;
+        timer.start();
+
+        var schedule = getLocalSchedule();
+        var chcResult = getLocalResult();
+
+        var isInit = true;
+        ListFolderResult result = dbClient.listFolder("/" + id);
+        while (true) try {
             LocalDate now = LocalDate.now();
-            if (started.equals(now)) {
-                writer.println(now);
-                writer.println(elapsed);
+            for (Metadata metadata : result.getEntries()) {
+                var path = metadata.getPathLower();
+                Logger.log("path: " + path);
+                if (metadata instanceof FolderMetadata) continue;
+
+                if (path.endsWith(SCHEDULE)) schedule = fetch(path, dbClient, mapper, Schedule.class);
+                if (isInit) {
+                    if (path.endsWith(now + RESULT)) chcResult = fetch(path, dbClient, mapper, ChcResult.class);
+                    preElapsed = chcResult != null && now.equals(chcResult.getDate()) ? chcResult.getElapsed() : Duration.ZERO;
+                }
+                Logger.log(schedule);
             }
+            maxTime = getMaxTime(schedule);
+            isInit = false;
+
+            if (!result.getHasMore()) upload(dbClient, mapper);
+            result = dbClient.listFolderContinue(result.getCursor());
+        } catch (Exception e) {
+            Logger.log(e.getMessage());
+        }
+    }
+
+    private static Duration getMaxTime(Schedule schedule) {
+        LocalDate now = LocalDate.now();
+        if (schedule == null) return Duration.ofMinutes(10);
+
+        var dateMaxTime = schedule.getCalendar().get(now);
+        if (dateMaxTime != null) return dateMaxTime;
+
+        var week = schedule.getWeek();
+        var weekMaxTime = switch (now.getDayOfWeek()) {
+            case MONDAY -> week.getMonday();
+            case TUESDAY -> week.getTuesday();
+            case WEDNESDAY -> week.getWednesday();
+            case THURSDAY -> week.getTuesday();
+            case FRIDAY -> week.getFriday();
+            case SATURDAY -> week.getSaturday();
+            case SUNDAY -> week.getSunday();
+        };
+        if (weekMaxTime != null) return weekMaxTime;
+        return schedule.getEveryDay();
+    }
+
+    private static ChcResult getLocalResult() throws IOException {
+        var file = new File(HomePath.home, "result.json");
+        if (file.exists()) {
+            return mapper.readValue(file, ChcResult.class);
+        }
+        return null;
+    }
+
+    private static Schedule getLocalSchedule() throws IOException {
+        var file = new File(HomePath.home, "schedule.json");
+        if (file.exists()) {
+            return mapper.readValue(file, Schedule.class);
+        }
+        return null;
+    }
+
+    private static void upload(DBClient dbClient, ObjectMapper mapper) throws Exception {
+        var rem = System.currentTimeMillis() % PERIOD;
+        Thread.sleep(rem);
+        if (isLocked) return;
+
+        var now = LocalDate.now();
+        ChcResult result = new ChcResult(now, Duration.ofMinutes(2), null);
+        byte[] bytes = mapper.writeValueAsBytes(result);
+
+        try (OutputStream os = new FileOutputStream(HomePath.home + "result.json")) {
+            os.write(bytes);
         } catch (IOException e) {
             Logger.log("Can't write to file");
         }
+
+        try (InputStream is = new ByteArrayInputStream(bytes)) {
+            dbClient.upload("/" + id + "/" + now + "result.json", is);
+        }
     }
 
-    private static void start() {
-        isLocked = false;
-        started = LocalDate.now();
-        try {
-            file = new File(HomePath.home, "data");
-            if (file.exists()) {
-                try (BufferedReader reader = new BufferedReader(new FileReader(file, UTF_8))) {
-                    LocalDate now = LocalDate.now();
-                    LocalDate date = LocalDate.parse(reader.readLine());
-                    if (date.equals(now)) preElapsed = Duration.parse(reader.readLine());
-                }
-            }
-
-            File file = new File(HomePath.home, "data.ko");
-            if (file.exists()) {
-                try (BufferedReader reader = new BufferedReader(new FileReader(file, UTF_8))) {
-                    maxTime = Duration.parse(reader.readLine());
-                }
-            }
-        } catch (Exception e) {
-            Logger.log("Can't read file");
+    private static <T> T fetch(String path, DBClient dbClient, ObjectMapper mapper, Class<T> clazz) throws IOException, DbxException {
+        try (
+                DbxDownloader<FileMetadata> content = dbClient.download(path);
+                InputStream is = content.getInputStream()
+        ) {
+            return mapper.readValue(is, clazz);
         }
-        timer.start();
     }
 
     private static void createAndShowGUI() {
@@ -115,14 +201,14 @@ public class Main {
         desktop.addAppEventListener(new UserSessionListener() {
             @Override
             public void userSessionDeactivated(UserSessionEvent aE) {
+                isLocked = true;
                 Logger.log("out: " + LocalDateTime.now());
-                fine(file);
             }
 
             @Override
             public void userSessionActivated(UserSessionEvent aE) {
+                isLocked = false;
                 Logger.log("-in: " + LocalDateTime.now());
-                start();
             }
         });
 

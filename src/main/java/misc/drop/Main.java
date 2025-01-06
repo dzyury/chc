@@ -56,11 +56,11 @@ public class Main {
         var rem = System.currentTimeMillis() % PERIOD;
         Thread.sleep(rem);
 
-        var date = LocalDate.now();
-        ChcResult result = new ChcResult(Duration.ofMinutes(2), null);
+        var now = LocalDate.now();
+        ChcResult result = new ChcResult(now, Duration.ofMillis(2), null);
         byte[] bytes = mapper.writeValueAsBytes(result);
         try (InputStream is = new ByteArrayInputStream(bytes)) {
-            dbClient.upload("/cat/test" + date + ".txt", is);
+            dbClient.upload("/cat/test" + now + ".txt", is);
         }
     }
 
