@@ -29,6 +29,7 @@ import java.net.URL;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Arrays;
 
 import static java.time.temporal.ChronoUnit.SECONDS;
 
@@ -36,7 +37,8 @@ public class Main {
     private static final String RESULT = "result.json";
     private static final String SCHEDULE = "schedule.json";
     public static final int PERIOD = 300_000; // 5 min
-    public static Duration maxTime = Duration.ofHours(1);
+    public static final Duration MAX_TIME = Duration.ofMinutes(10);
+    public static Duration maxTime = MAX_TIME;
 
     public static String id;
     public static Dialog dialog;
@@ -48,6 +50,7 @@ public class Main {
     public static LocalDateTime started = LocalDateTime.now();
     public static Duration preElapsed = Duration.ZERO;
     public static Duration elapsed = Duration.ZERO;
+    public static Duration skipped = Duration.ZERO;
     public static ObjectMapper mapper = JsonMapper.builder()
             .addModule(new JavaTimeModule())
             .build()
@@ -57,11 +60,12 @@ public class Main {
         LocalDateTime now = LocalDateTime.now();
         if (!now.toLocalDate().equals(started.toLocalDate())) {
             started = now;
+            skipped = Duration.ZERO;
             preElapsed = Duration.ZERO;
         }
 
-        if (!isLocked) {
-            elapsed = preElapsed.plus(Duration.between(started, now));
+        if (isLocked) skipped = skipped.plus(Duration.ofSeconds(1)); else {
+            elapsed = preElapsed.plus(Duration.between(started, now)).minus(skipped);
             dialog.update(maxTime.minus(elapsed).toSeconds());
             if (elapsed.compareTo(maxTime) > 0) {
                 man.shutdown();
@@ -78,7 +82,7 @@ public class Main {
             Lock.lock();
             Processes.print();
         } catch (Exception e) {
-            Logger.log(e.getMessage());
+            Logger.log(Arrays.deepToString(e.getStackTrace()));
             return;
         }
 
@@ -110,7 +114,7 @@ public class Main {
             LocalDate now = LocalDate.now();
             for (Metadata metadata : result.getEntries()) {
                 var path = metadata.getPathLower();
-                Logger.log("path: " + path);
+//                Logger.log("path: " + path);
                 if (metadata instanceof FolderMetadata) continue;
 
                 if (path.endsWith(SCHEDULE)) schedule = fetch(path, dbClient, mapper, Schedule.class);
@@ -118,7 +122,7 @@ public class Main {
                     if (path.endsWith(now + RESULT)) chcResult = fetch(path, dbClient, mapper, ChcResult.class);
                     preElapsed = chcResult != null && now.equals(chcResult.getDate()) ? chcResult.getElapsed() : Duration.ZERO;
                 }
-                Logger.log(schedule);
+//                Logger.log("schedule: " + schedule);
             }
             maxTime = getMaxTime(schedule);
             isInit = false;
@@ -126,13 +130,13 @@ public class Main {
             if (!result.getHasMore()) upload(dbClient, mapper);
             result = dbClient.listFolderContinue(result.getCursor());
         } catch (Exception e) {
-            Logger.log(e.getMessage());
+            Logger.log(Arrays.deepToString(e.getStackTrace()));
         }
     }
 
     private static Duration getMaxTime(Schedule schedule) {
         LocalDate now = LocalDate.now();
-        if (schedule == null) return Duration.ofMinutes(10);
+        if (schedule == null) return MAX_TIME;
 
         var dateMaxTime = schedule.getCalendar().get(now);
         if (dateMaxTime != null) return dateMaxTime;
@@ -172,18 +176,19 @@ public class Main {
         Thread.sleep(rem);
         if (isLocked) return;
 
-        var now = LocalDate.now();
-        ChcResult result = new ChcResult(now, Duration.ofMinutes(2), null);
+        var date = LocalDate.now();
+        var elapsed = Duration.between(started, LocalDateTime.now());
+        ChcResult result = new ChcResult(date, elapsed.minus(skipped), null);
         byte[] bytes = mapper.writeValueAsBytes(result);
 
-        try (OutputStream os = new FileOutputStream(HomePath.home + "result.json")) {
+        try (OutputStream os = new FileOutputStream(HomePath.home + "/result.json")) {
             os.write(bytes);
         } catch (IOException e) {
             Logger.log("Can't write to file");
         }
 
         try (InputStream is = new ByteArrayInputStream(bytes)) {
-            dbClient.upload("/" + id + "/" + now + "result.json", is);
+            dbClient.upload("/" + id + "/" + date + "result.json", is);
         }
     }
 

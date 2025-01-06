@@ -17,6 +17,7 @@ import misc.data.Token;
 import java.io.InputStream;
 
 import static com.dropbox.core.v2.auth.AuthError.Tag.EXPIRED_ACCESS_TOKEN;
+import static com.dropbox.core.v2.files.WriteMode.OVERWRITE;
 
 @Data
 // https://www.dropboxforum.com/discussions/101000014/issue-in-generating-access-token/592667
@@ -74,6 +75,6 @@ public class DBClient {
     }
 
     public void upload(String path, InputStream is) throws Exception {
-        withRetry(() -> client.files().uploadBuilder(path).uploadAndFinish(is));
+        withRetry(() -> client.files().uploadBuilder(path).withMode(OVERWRITE).uploadAndFinish(is));
     }
 }
