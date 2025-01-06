@@ -1,5 +1,7 @@
 package misc;
 
+import misc.data.Logger;
+
 import java.util.Optional;
 import java.util.TreeMap;
 
@@ -21,7 +23,7 @@ public class Processes {
             if (key.contains("\\Telegram.exe")) return;
             if (key.contains("\\Far.exe")) return;
             if (key.contains("C:\\Windows")) return;
-            System.out.println(val);
+            Logger.log(val);
         });
     }
 

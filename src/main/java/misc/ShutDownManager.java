@@ -1,5 +1,7 @@
 package misc;
 
+import misc.data.Logger;
+
 public class ShutDownManager {
     public void shutdown() {
         try {
@@ -17,7 +19,7 @@ public class ShutDownManager {
             Runtime.getRuntime().exec(shutdownCommand);
             System.exit(0);
         } catch (Exception ex) {
-            System.out.println("KO");
+            Logger.log("KO");
         }
     }
 }

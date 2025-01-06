@@ -13,7 +13,7 @@ public class Main {
           "everyDay": "pt60m",
           "week": {
             "sunday": "pt100m"
-          }, 
+          },
           "calendar": {
             "2024-01-07": "pt80m"
           }
@@ -24,7 +24,7 @@ public class Main {
                 .build()
                 .setSerializationInclusion(JsonInclude.Include.NON_NULL);
         Schedule schedule = mapper.readValue(json, Schedule.class);
-        System.out.println(schedule);
-        System.out.println(mapper.writeValueAsString(schedule));
+        Logger.log(schedule);
+        Logger.log(mapper.writeValueAsString(schedule));
     }
 }

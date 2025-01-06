@@ -1,5 +1,7 @@
 package misc;
 
+import misc.data.Logger;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.desktop.UserSessionEvent;
@@ -26,12 +28,12 @@ public class Main {
     public static volatile boolean isDialogVisible = false;
     public static volatile boolean isLocked = false;
 
-    public static LocalDateTime started = LocalDateTime.now();
+    public static LocalDate started = LocalDate.now();
     public static Duration preElapsed = Duration.ofSeconds(0);
     public static Duration elapsed = preElapsed;
     public static Timer timer = new Timer(1000, e -> {
-        LocalDateTime now = LocalDateTime.now();
-        if (!now.toLocalDate().equals(started.toLocalDate())) {
+        LocalDate now = LocalDate.now();
+        if (!now.equals(started)) {
             started = now;
             preElapsed = Duration.ofSeconds(0);
         }
@@ -45,26 +47,26 @@ public class Main {
         }
     });
 
-    public static void main(String[] args) throws InterruptedException {
-        System.out.println(LocalDateTime.now().truncatedTo(SECONDS));
+    public static void main(String[] args) {
+        Logger.log(LocalDateTime.now().truncatedTo(SECONDS));
         try {
             Lock.lock();
             Processes.print();
         } catch (Exception e) {
-            throw new RuntimeException(e);
+            Logger.log(e.getMessage());
+            return;
         }
 
         start();
-        System.out.println("Started");
-
+        Logger.log("Started");
         Thread hook = new Thread(() -> {
             try {
                 fine(file);
                 Lock.release();
             } catch (Exception e) {
-                System.out.println("Error writing into file: " + e.getMessage());
+                Logger.log("Error writing into file: " + e.getMessage());
             }
-            System.out.println("In the middle of a shutdown");
+            Logger.log("In the middle of a shutdown");
         });
         Runtime.getRuntime().addShutdownHook(hook);
         SwingUtilities.invokeLater(Main::createAndShowGUI);
@@ -74,18 +76,18 @@ public class Main {
         isLocked = true;
         try (PrintWriter writer = new PrintWriter(file, UTF_8)) {
             LocalDate now = LocalDate.now();
-            if (started.toLocalDate().equals(now)) {
+            if (started.equals(now)) {
                 writer.println(now);
                 writer.println(elapsed);
             }
         } catch (IOException e) {
-            System.out.println("Can't write to file");
+            Logger.log("Can't write to file");
         }
     }
 
     private static void start() {
         isLocked = false;
-        started = LocalDateTime.now();
+        started = LocalDate.now();
         try {
             file = new File(HomePath.home, "data");
             if (file.exists()) {
@@ -103,7 +105,7 @@ public class Main {
                 }
             }
         } catch (Exception e) {
-            System.out.println("Can't read file");
+            Logger.log("Can't read file");
         }
         timer.start();
     }
@@ -113,20 +115,20 @@ public class Main {
         desktop.addAppEventListener(new UserSessionListener() {
             @Override
             public void userSessionDeactivated(UserSessionEvent aE) {
-                System.out.println("out: " + LocalDateTime.now());
+                Logger.log("out: " + LocalDateTime.now());
                 fine(file);
             }
 
             @Override
             public void userSessionActivated(UserSessionEvent aE) {
-                System.out.println("-in: " + LocalDateTime.now());
+                Logger.log("-in: " + LocalDateTime.now());
                 start();
             }
         });
 
         dialog = new Dialog();
         if (!SystemTray.isSupported()) {
-            System.out.println("SystemTray is not supported");
+            Logger.log("SystemTray is not supported");
             return;
         }
         TrayIcon trayIcon = new TrayIcon(createImage());
@@ -136,7 +138,7 @@ public class Main {
         try {
             tray.add(trayIcon);
         } catch (AWTException e) {
-            System.out.println("TrayIcon could not be added.");
+            Logger.log("TrayIcon could not be added.");
             return;
         }
 

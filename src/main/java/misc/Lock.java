@@ -1,5 +1,7 @@
 package misc;
 
+import misc.data.Logger;
+
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -18,7 +20,7 @@ public class Lock {
 
             lock = channel.tryLock();
             if (lock == null) {
-                System.out.println("Lock is not acquired");
+                Logger.log("Lock is not acquired");
                 throw new IllegalArgumentException("Can't lock file: " + lockFile);
             }
         } catch (Exception e) {

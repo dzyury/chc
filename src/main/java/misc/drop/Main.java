@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import misc.data.ChcResult;
+import misc.data.Logger;
 import misc.data.Schedule;
 
 import java.io.ByteArrayInputStream;
@@ -28,7 +29,7 @@ public class Main {
         // Get current account info
         DBClient dbClient = new DBClient();
         FullAccount account = dbClient.getCurrentAccount();
-        System.out.println(account.getName().getDisplayName());
+        Logger.log(account.getName().getDisplayName());
         // Get files and folder metadata from Dropbox root directory
         ObjectMapper mapper = JsonMapper.builder()
                 .addModule(new JavaTimeModule())
@@ -38,12 +39,12 @@ public class Main {
         ListFolderResult result = dbClient.listFolder("/cat");
         while (true) {
             for (Metadata metadata : result.getEntries()) {
-                System.out.println(metadata.getPathLower());
+                Logger.log(metadata.getPathLower());
                 if (metadata instanceof FolderMetadata) continue;
                 if (!SCHEDULE.equals(metadata.getPathLower())) continue;
 
                 Schedule schedule = fetch(metadata, dbClient, mapper);
-                System.out.println(schedule);
+                Logger.log(schedule);
             }
 
             if (!result.getHasMore()) upload(dbClient, mapper);
