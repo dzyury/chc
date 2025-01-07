@@ -85,6 +85,9 @@ public class DBClient {
 
             try (InputStream is = content.getInputStream()) {
                 return mapper.readValue(is, clazz);
+            } catch (Exception e) {
+                e.printStackTrace();
+                return null;
             }
         }
     }

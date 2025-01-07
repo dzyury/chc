@@ -19,7 +19,7 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.Duration;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 public class Main {
     private static final String SCHEDULE = "/cat/schedule.json";
@@ -56,11 +56,11 @@ public class Main {
         var rem = System.currentTimeMillis() % PERIOD;
         Thread.sleep(rem);
 
-        var now = LocalDate.now();
+        var now = LocalDateTime.now();
         ChcResult result = new ChcResult(now, Duration.ofMillis(2), null);
         byte[] bytes = mapper.writeValueAsBytes(result);
         try (InputStream is = new ByteArrayInputStream(bytes)) {
-            dbClient.upload("/cat/test" + now + ".txt", is);
+            dbClient.upload("/cat/test" + now.toLocalDate() + ".txt", is);
         }
     }
 

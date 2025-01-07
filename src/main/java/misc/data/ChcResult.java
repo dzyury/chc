@@ -6,14 +6,14 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.Duration;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class ChcResult {
     @JsonFormat(shape = JsonFormat.Shape.STRING)
-    private LocalDate date;
+    private LocalDateTime date;
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     private Duration elapsed;
     @JsonFormat(shape = JsonFormat.Shape.STRING)

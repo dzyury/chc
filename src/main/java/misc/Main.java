@@ -89,7 +89,7 @@ public class Main {
         Logger.log("Started");
         Thread hook = new Thread(() -> {
             try {
-                upload(dbClient, mapper);
+                upload(dbClient, mapper, true);
                 Lock.release();
             } catch (Exception e) {
                 Logger.log("Error writing into file: " + e.getMessage());
@@ -127,7 +127,7 @@ public class Main {
             maxTime = getMaxTime(schedule);
             isInit = false;
 
-            if (!result.getHasMore()) upload(dbClient, mapper);
+            if (!result.getHasMore()) upload(dbClient, mapper, false);
             result = dbClient.listFolderContinue(result.getCursor());
         } catch (Exception e) {
             Logger.log(Arrays.deepToString(e.getStackTrace()));
@@ -171,14 +171,17 @@ public class Main {
         return null;
     }
 
-    private static void upload(DBClient dbClient, ObjectMapper mapper) throws Exception {
-        var rem = System.currentTimeMillis() % PERIOD;
-        Thread.sleep(rem);
+    private static void upload(DBClient dbClient, ObjectMapper mapper, boolean isForced) throws Exception {
+        if (!isForced) {
+            var rem = (PERIOD - System.currentTimeMillis() % PERIOD) % PERIOD;
+            System.out.printf("rem: %.2f\n", rem/1000/60.0);
+            Thread.sleep(rem);
+        }
         if (isLocked) return;
 
-        var date = LocalDate.now();
+        var date = LocalDateTime.now();
         var elapsed = Duration.between(started, LocalDateTime.now());
-        ChcResult result = new ChcResult(date, elapsed.minus(skipped), null);
+        ChcResult result = new ChcResult(date, elapsed.minus(skipped), maxTime);
         byte[] bytes = mapper.writeValueAsBytes(result);
 
         try (OutputStream os = new FileOutputStream(HomePath.home + "/result.json")) {
@@ -188,7 +191,7 @@ public class Main {
         }
 
         try (InputStream is = new ByteArrayInputStream(bytes)) {
-            dbClient.upload("/" + id + "/" + date + "result.json", is);
+            dbClient.upload("/" + id + "/" + date.toLocalDate() + "result.json", is);
         }
     }
 
