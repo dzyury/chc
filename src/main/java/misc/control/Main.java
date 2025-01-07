@@ -72,10 +72,10 @@ public class Main {
         labels[10] = new DatePicker();
 
         texts = new JTextField[11];
-        for (int i = 0; i < 11; i++) texts[i] = new JTextField("60m", 6);
+        for (int i = 0; i < 11; i++) texts[i] = new JTextField("", 6);
         elaps = new JTextField[11];
         for (int i = 0; i < 11; i++) {
-            elaps[i] = new JTextField("60m", 6);
+            elaps[i] = new JTextField("", 6);
             elaps[i].setEnabled(false);
         }
 
@@ -144,7 +144,14 @@ public class Main {
                     var picker = (DatePicker) labels[idx.get()];
                     picker.setDate(entry.getKey());
                     texts[idx.get()].setText(toText(entry.getValue()));
+                    idx.incrementAndGet();
                 });
+            }
+            for (int i = idx.get(); i < 11; i++) {
+                var picker = (DatePicker) labels[i];
+                picker.setText("");
+                texts[idx.get()].setText("");
+                elaps[idx.get()].setText("");
             }
         }
         System.out.println("schedule: " + schedule);
