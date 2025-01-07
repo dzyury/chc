@@ -18,12 +18,10 @@ import misc.drop.DBClient;
 import javax.swing.*;
 import java.awt.*;
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.io.InputStream;
 import java.time.DayOfWeek;
 import java.time.Duration;
 import java.time.LocalDate;
-import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -31,13 +29,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import static java.time.temporal.ChronoUnit.SECONDS;
 
 public class Main {
-    private static DBClient dbClient = new DBClient();
+    private static final DBClient dbClient = new DBClient();
     public static ObjectMapper mapper = JsonMapper.builder()
             .addModule(new JavaTimeModule())
             .build()
             .setSerializationInclusion(JsonInclude.Include.NON_NULL);
 
-    private static JFrame frame;
     private static JComboBox<String> combo;
     private static JComponent[] labels;
     private static JTextField[] texts;
@@ -51,7 +48,7 @@ public class Main {
             if (metadata instanceof FolderMetadata) ids.add(path.substring(1));
         }
 
-        frame = new JFrame();
+        JFrame frame = new JFrame();
         Container cp =  frame.getContentPane();
 
         JPanel week = new JPanel();

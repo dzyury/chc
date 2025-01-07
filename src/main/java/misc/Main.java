@@ -36,7 +36,7 @@ import static java.time.temporal.ChronoUnit.SECONDS;
 public class Main {
     private static final String RESULT = "result.json";
     private static final String SCHEDULE = "schedule.json";
-    public static final int PERIOD = 300_000; // 5 min
+    public static final int PERIOD = 60_000; // 1 min
     public static final Duration MAX_TIME = Duration.ofMinutes(10);
     public static Duration maxTime = MAX_TIME;
 
@@ -118,11 +118,10 @@ public class Main {
                 if (metadata instanceof FolderMetadata) continue;
 
                 if (path.endsWith(SCHEDULE)) schedule = fetch(path, dbClient, mapper, Schedule.class);
-                if (isInit) {
-                    if (path.endsWith(now + RESULT)) chcResult = fetch(path, dbClient, mapper, ChcResult.class);
-                    preElapsed = chcResult != null && now.equals(chcResult.getDate()) ? chcResult.getElapsed() : Duration.ZERO;
-                }
-//                Logger.log("schedule: " + schedule);
+                if (isInit && path.endsWith(now + RESULT)) chcResult = fetch(path, dbClient, mapper, ChcResult.class);
+            }
+            if (isInit) {
+                preElapsed = chcResult != null && now.equals(chcResult.getDate()) ? chcResult.getElapsed() : Duration.ZERO;
             }
             maxTime = getMaxTime(schedule);
             isInit = false;
@@ -138,7 +137,8 @@ public class Main {
         LocalDate now = LocalDate.now();
         if (schedule == null) return MAX_TIME;
 
-        var dateMaxTime = schedule.getCalendar().get(now);
+        var calendar = schedule.getCalendar();
+        var dateMaxTime = calendar == null ? null : calendar.get(now);
         if (dateMaxTime != null) return dateMaxTime;
 
         var week = schedule.getWeek();
@@ -174,14 +174,14 @@ public class Main {
     private static void upload(DBClient dbClient, ObjectMapper mapper, boolean isForced) throws Exception {
         if (!isForced) {
             var rem = (PERIOD - System.currentTimeMillis() % PERIOD) % PERIOD;
-            System.out.printf("rem: %.2f\n", rem/1000/60.0);
+            System.out.printf("rem: %.2fm\n", rem/1000/60.0);
             Thread.sleep(rem);
         }
         if (isLocked) return;
 
-        var date = LocalDateTime.now();
-        var elapsed = Duration.between(started, LocalDateTime.now());
-        ChcResult result = new ChcResult(date, elapsed.minus(skipped), maxTime);
+        var now = LocalDateTime.now();
+        var elapsed = Duration.between(started, now);
+        ChcResult result = new ChcResult(now, preElapsed.plus(elapsed.minus(skipped)), maxTime);
         byte[] bytes = mapper.writeValueAsBytes(result);
 
         try (OutputStream os = new FileOutputStream(HomePath.home + "/result.json")) {
@@ -191,7 +191,7 @@ public class Main {
         }
 
         try (InputStream is = new ByteArrayInputStream(bytes)) {
-            dbClient.upload("/" + id + "/" + date.toLocalDate() + "result.json", is);
+            dbClient.upload("/" + id + "/" + now.toLocalDate() + "result.json", is);
         }
     }
 
