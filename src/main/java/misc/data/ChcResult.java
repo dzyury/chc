@@ -16,5 +16,6 @@ public class ChcResult {
     private LocalDate date;
     @JsonFormat(shape = JsonFormat.Shape.STRING)
     private Duration elapsed;
-    private String logs;
+    @JsonFormat(shape = JsonFormat.Shape.STRING)
+    private Duration limit;
 }

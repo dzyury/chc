@@ -77,4 +77,16 @@ public class DBClient {
     public void upload(String path, InputStream is) throws Exception {
         withRetry(() -> client.files().uploadBuilder(path).withMode(OVERWRITE).uploadAndFinish(is));
     }
+
+    @SneakyThrows
+    public <T> T fetch(String path, ObjectMapper mapper, Class<T> clazz) {
+        try (DbxDownloader<FileMetadata> content = download(path)) {
+            if (content == null) return null;
+
+            try (InputStream is = content.getInputStream()) {
+                return mapper.readValue(is, clazz);
+            }
+        }
+    }
+
 }
