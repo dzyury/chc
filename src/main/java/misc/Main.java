@@ -45,6 +45,7 @@ public class Main {
     public static ShutDownManager man = new ShutDownManager();
     public static volatile boolean isDialogVisible = false;
     public static volatile boolean isLocked = false;
+    public static volatile boolean isInit = true;
 
     public static DBClient dbClient = new DBClient();
     public static LocalDateTime started = LocalDateTime.now();
@@ -66,7 +67,7 @@ public class Main {
 
         if (isLocked) skipped = skipped.plus(Duration.ofSeconds(1)); else {
             elapsed = preElapsed.plus(Duration.between(started, now)).minus(skipped);
-            dialog.update(maxTime.minus(elapsed).toSeconds());
+            dialog.update(isInit ? null : maxTime.minus(elapsed));
             if (elapsed.compareTo(maxTime) > 0) {
                 man.shutdown();
             }
@@ -89,6 +90,7 @@ public class Main {
         Logger.log("Started");
         Thread hook = new Thread(() -> {
             try {
+                System.out.println("(f) update " + preElapsed + "/" + elapsed);
                 upload(dbClient, mapper, true);
                 Lock.release();
             } catch (Exception e) {
@@ -107,8 +109,8 @@ public class Main {
 
         var schedule = getLocalSchedule();
         var chcResult = getLocalResult();
+        System.out.println("local result: " + chcResult);
 
-        var isInit = true;
         ListFolderResult result = dbClient.listFolder("/" + id);
         while (true) try {
             LocalDate now = LocalDate.now();
@@ -118,10 +120,16 @@ public class Main {
                 if (metadata instanceof FolderMetadata) continue;
 
                 if (path.endsWith(SCHEDULE)) schedule = fetch(path, dbClient, mapper, Schedule.class);
-                if (isInit && path.endsWith(now + RESULT)) chcResult = fetch(path, dbClient, mapper, ChcResult.class);
+                if (isInit && path.endsWith(now + RESULT)) {
+                    chcResult = fetch(path, dbClient, mapper, ChcResult.class);
+                    System.out.println("fetch result: " + chcResult);
+                }
             }
             if (isInit) {
-                preElapsed = chcResult != null && now.equals(chcResult.getDate()) ? chcResult.getElapsed() : Duration.ZERO;
+                preElapsed = chcResult != null && now.equals(chcResult.getDate().toLocalDate())
+                        ? chcResult.getElapsed()
+                        : Duration.ZERO;
+                System.out.println("(s) preelapsed: " + preElapsed);
             }
             maxTime = getMaxTime(schedule);
             isInit = false;

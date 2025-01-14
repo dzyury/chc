@@ -2,6 +2,7 @@ package misc;
 
 import javax.swing.*;
 import java.awt.*;
+import java.time.Duration;
 
 import static java.awt.FlowLayout.CENTER;
 
@@ -34,8 +35,14 @@ public class Dialog extends JWindow {
 //        });
     }
 
-    public void update(long time) {
-        timer.setText(String.format("%02d:%02d:%02d", time / 3600, time % 3600 / 60, time % 60));
+    public void update(Duration duration) {
+        String text = "--:--";
+        if (duration != null) {
+            long time = duration.toSeconds();
+            text = String.format("%02d:%02d:%02d", time / 3600, time % 3600 / 60, time % 60);
+        }
+
+        timer.setText(text);
         timer.repaint();
     }
 }

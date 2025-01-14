@@ -11,7 +11,7 @@ public class ShutDownManager {
             if ("Linux".equals(operatingSystem) || "Mac OS X".equals(operatingSystem)) {
                 shutdownCommand = "shutdown -h now";
             } else if (operatingSystem.startsWith("Windows")) {
-                shutdownCommand = "shutdown.exe -s -t 0";
+                shutdownCommand = "shutdown.exe /s /f /t 0";
             } else {
                 throw new RuntimeException("Unsupported operating system.");
             }
